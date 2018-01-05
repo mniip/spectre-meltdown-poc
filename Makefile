@@ -1,5 +1,5 @@
 CC= cc
-CFLAGS += -O0
+CFLAGS += -O0 -std=gnu99
 LDFLAGS += -lm
 CPPFLAGS +=
 
