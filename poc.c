@@ -135,10 +135,8 @@ extern void stall_speculate(void *, char (*)[4096]);
 asm(
 ".section .text\n"
 ".global stall_speculate\n"
-"	lfence\n"
 "stall_speculate:\n"
-TENFOLD(TENFOLD("	addq $141, %rax\n"))
-TENFOLD(TENFOLD("	addq $141, %rax\n"))
+"	lfence\n"
 TENFOLD(TENFOLD("	addq $141, %rax\n"))
 "	xorq %rdx, %rdx\n"
 "	movb (%rdi), %dl\n"
