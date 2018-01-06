@@ -285,11 +285,11 @@ int calculate_cutoff(channel *ch)
 #ifdef POISON
 	collect_stats(ch, &test_one);
 	int med_hit = median(timing[0], TIME_DIVS) * TIME_BUCKET;
-	int med_miss = median(timing[2], TIME_DIVS) * TIME_BUCKET;
+	int med_miss = median(timing[128], TIME_DIVS) * TIME_BUCKET;
 	cutoff_time = (med_hit + med_miss) / 2;
 #else
 	collect_stats(ch, NULL);
-	int med_miss = median(timing[1], TIME_DIVS) * TIME_BUCKET;
+	int med_miss = median(timing[128], TIME_DIVS) * TIME_BUCKET;
 	cutoff_time = med_miss / 2;
 #endif
 }
