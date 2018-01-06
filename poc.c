@@ -341,32 +341,38 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 
 //#define MAX_UNCERTAINTY 5.4e-20
 #define MAX_UNCERTAINTY 8.636e-78
-#define MAX_RETRIES 500
-int read_byte(channel *ch, void *addr)
+#define MAX_RETRIES 100
+double distribution[256];
+int read_byte(channel *ch, void *addr, int verbose)
 {
-	double uncertainty;
-	int val = run_timing_once(ch, addr, &uncertainty);
-	//printf("[%d?]", val); fflush(NULL);
-	int retries = 0;
-	while(uncertainty > MAX_UNCERTAINTY)
+	for(int line = 0; line < 256; line++)
+		distribution[line] = 1.0 / 256;
+	int val = -1;
+	if(verbose)
+		printf("%20.13g %02x", 0, 0);
+	while(val == -1)
 	{
-		//printf("."); fflush(NULL);
 		double unc;
 		int newval = run_timing_once(ch, addr, &unc);
-		if(newval == val)
-		{
-			uncertainty *= unc;
-		}
-		else
-		{
-			//printf("[%d->%d]", val, newval); fflush(NULL);
-			uncertainty = unc;
-			val = newval;
-		}
-		
-		if(++retries > MAX_RETRIES)
-			return -1;
+		for(int line = 0; line < 256; line++)
+			if(line != newval)
+				distribution[line] = fmin(1.0, distribution[line] / unc);
+		distribution[newval] *= unc;
+
+		for(int line = 0; line < 256; line++)
+			if(distribution[line] < MAX_UNCERTAINTY)
+				val = line;
+
+		int md = 0;
+		for(int line = 0; line < 256; line++)
+			if(distribution[line] < distribution[md])
+				md = line;
+
+		if(verbose)
+			printf("\e[23D%20.13g %02x", distribution[md], md); fflush(stdout);
 	}
+	if(verbose)
+		printf("\e[23D");
 	return val;
 }
 
