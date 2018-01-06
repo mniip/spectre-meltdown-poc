@@ -16,6 +16,8 @@ $ ./poc ffffffff8f800180
 ...
 ```
 
+![Motivational GIF](http://tcpst.net/unea.gif)
+
 Read kernel addresses by poisoning the branch predictor and speculatively hitting a cacheline:
 ```
 $ ./poc_poison ffffffff8f800180
