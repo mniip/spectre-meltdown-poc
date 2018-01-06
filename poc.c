@@ -426,8 +426,17 @@ int main(int argc, char *argv[])
 #else
 
 	calculate_cutoff(&ch);
-	
-	for(int ln = 0; ln < 4096 / 8; ln++)
+	printf("cutoff: %d\n", cutoff_time);
+#ifdef RANDOMIZE
+	while(1)
+	{
+		void *a = addr + rand() % 0x481f00000;
+		int val = read_byte(&ch, a, 1);
+		if(val > 0)
+			printf("%p: %02x\n", a, val);
+	}
+#else
+	for(int ln = 0; ln < 4096 / 16; ln++)
 	{
 		printf("%p | ", addr + ln * 16);
 		for(int p = 0; p < 16; p++)
@@ -441,5 +450,6 @@ int main(int argc, char *argv[])
 		}
 		printf("\n");
 	}
+#endif
 #endif
 }
