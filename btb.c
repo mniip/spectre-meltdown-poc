@@ -37,7 +37,7 @@ asm(
 "btb_time_branch_end:\n"
 "	rdtsc\n"
 "	retq\n"
-"	.skip 100\n"
+"	.skip 100+14\n"
 "1:	rdtsc\n"
 "	retq\n"
 "btb_time_end:\n"
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 				}
 
 		if(counts[0][0] > 4 * counts[1][0] && counts[1][1] > 4 * counts[0][1])
-			printf("Likely collision: %08x\n", mask);
+			printf("Likely collision: %08x (%zu+%zu vs %zu+%zu)\n", mask, counts[0][0], counts[1][1], counts[1][0], counts[0][1]);
 
 		mask = nextmask(mask);
 		madvise((void*)(0x200000000000ull - 0x1000), 0x100000000ull + 0x2000, MADV_REMOVE);
