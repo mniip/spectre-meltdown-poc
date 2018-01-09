@@ -27,6 +27,13 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+
+Alejandro Caceres fork license:
+
+What the dude above said.
+*/
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -439,17 +446,43 @@ int main(int argc, char *argv[])
 	for(int ln = 0; ln < 4096 / 16; ln++)
 	{
 		printf("%p | ", addr + ln * 16);
+
+		int endianize[50] = { 0 };
 		for(int p = 0; p < 16; p++)
 		{
-			int val = read_byte(&ch, addr + ln * 16 + p, 1);
-			if(val == -1)
-				printf("?? ");
-			else
-				printf("%02x ", val);
-			fflush(stdout);
+		  //dbg printf("%s", "instantiating buffer\n");
+		  int val = read_byte(&ch, addr + ln * 16 + p, 1);
+		  if(val == -1) {
+		    printf("?? ");
+		  }
+		  else {
+		    //should hit this
+		    endianize[p] = val;
+		  }
+		}
+
+		int x;
+		for (x = 16; x >= 1; --x)
+		{
+
+		  
+		  if(x == 8) {
+		    printf("%02x ", endianize[x]);
+		  }
+		  else if (x == 0) {
+		    
+		  }
+		  else {
+		    printf("%02x", endianize[x]);
+		  }
+		      
 		}
 		printf("\n");
+		//fflush(stdout);
+		memset(&endianize[0], 0, sizeof(endianize));
 	}
+		//printf("\nClearing buffer\n");
+		//printf("%x", endianize);
 #endif
 #endif
 }
