@@ -46,10 +46,12 @@ def scan():
     #read shit, do some string stuff, then see if we get hits in kallsyms, if yes then vulnerable
     kallsym_hits = 0
     for kallsym_line in open("/proc/kallsyms", "r"):
-        kallsym_line_addr = kallsym_line.split(" ")[0]
+        kallsym_line_list = kallsym_line.split(" ")
+        kallsym_line_addr = kallsym_line_list[0]
         if kallsym_line_addr in addresses:
-            print(kallsym_line.strip())
-            kallsym_hits += 1
+            print(kallsym_line.strip())            
+            if "sys" in kallsym_line_list[2].lower():
+                kallsym_hits += 1
 
     if kallsym_hits > 0:
         print("We were able to find the above addresses of your syscall table using speculative execution (mis)training. You are likely vulnerable to SPECTRE and/or Meltdown.")
