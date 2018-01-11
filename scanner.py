@@ -14,4 +14,6 @@ if __name__ == "__main__":
 
     _proc.communicate()
 
+    #read shit, see if we get hits in kallsyms, if yes vulnerable
+
     #disable kallsyms
